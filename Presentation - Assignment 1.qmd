@@ -1,6 +1,6 @@
 ---
 title: "Assignment 1 STAT40830"
-author: "Rodger Clery - 21325583"
+author: "Rodger Clery - 21325583 - 2"
 date: today
 date-format: long
 format: 
