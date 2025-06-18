@@ -1,0 +1,197 @@
+---
+title: "Assignment 1 STAT40830"
+author: "Rodger Clery - 21325583"
+date: today
+date-format: long
+format: 
+  revealjs:
+    theme: blood
+    transition: slide
+    slide-number: true
+    footer: "Slides made for Advanced Data Programming with R"
+    incremental: false
+    fragments: true
+    chalkboard: false
+    menu: true
+    scrollable: true
+    preview-links: false
+    embed-resources: false
+    standalone: false
+editor: visual
+execute: 
+  eval: true
+  echo: true
+---
+
+## Load the Package
+
+We use the `library` command to load the `data.table` package. If the package has not been installed, the function `install.packages` can be used to install the package as seen commented out below. Note that this function requires the package name to be in quotation marks, whereas the `library` function does not.
+
+```{r}
+# install.packages("data.table")
+library(data.table)
+```
+
+## Reading in Data {style="font-size: .8em;"}
+
+We read in the data using the function in the `data.table` package for reading data, `fread`.
+
+The first row in the data is the heading of the column. We assign these as the column headers using `header = TRUE`.
+
+The second line does not contain any data. For this reason, we exclude it from our dataset. We can do this by subsetting our data from the third row to the $N$th row. As the first row of the dataset becomes the header, each row is has an index in R one lower than their index in the .csv. As such the third row becomes the second row (hence indexing from $2$).
+
+```{r}
+# Read in the .csv files as data.tables and remove the first row
+indicators_irl <- fread("~/UCD Stuffs/Statistical Data Science - Summer/Advanced Data Programming with R/Assignment 1/Data/indicators_irl.csv", header = TRUE)[2:.N,,]
+indicators_lie <- fread("~/UCD Stuffs/Statistical Data Science - Summer/Advanced Data Programming with R/Assignment 1/Data/indicators_lie.csv", header = TRUE)[2:.N,,]
+indicators_nor <- fread("~/UCD Stuffs/Statistical Data Science - Summer/Advanced Data Programming with R/Assignment 1/Data/indicators_nor.csv", header = TRUE)[2:.N,,]
+```
+
+## Merging Data
+
+We merge the data using the function `rbindlist`. This is a function in the package `data.table` that merges `data.table` objects. `rbindlist` is the `data.table` equivalent of `rbind` for `data.frame` objects.
+
+```{r}
+# Merge the three countries into one data.table
+indicators <- rbindlist(list(indicators_irl,indicators_lie,indicators_nor))
+```
+
+## Assigning Correct Variable Classes
+
+Here we use the `:=` command to assign a class to each variable. Country Name, Country ISO3, Indicator Name, and Indicator Code are assigned the factor type; Year is assigned the integer type; and Value is assigned the numeric type.
+
+```{r}
+# Assign variables to the correct classes
+indicators <- indicators[,`Country Name`:=as.factor(`Country Name`),]
+indicators <- indicators[,`Country ISO3`:=as.factor(`Country ISO3`),]
+indicators <- indicators[,Year:=as.integer(Year),]
+indicators <- indicators[,`Indicator Name`:=as.factor(`Indicator Name`),]
+indicators <- indicators[,`Indicator Code`:=as.factor(`Indicator Code`),]
+indicators <- indicators[,Value:=as.numeric(Value),]
+indicators
+```
+
+# Exploratory Data Analysis {style="font-size: .75em;text-align: center"}
+
+## Country Frequency Table {style="font-size: .8em;"}
+
+Here we can see the number of records for each country.
+
+```{r}
+table(indicators$`Country Name`)
+table(indicators$`Country ISO3`)
+```
+
+Norway has the most, followed by closely by Ireland. Liechtenstein has the fewest.
+
+The same numbers are given for the country name and country code, indicating agreement between the two labels.
+
+## Indicators per Year - Total {style="font-size: .8em;"}
+
+Below is the total number of indicators by year across all three countries.
+
+```{r}
+plot(table(indicators$Year), type = "l",
+     main = "Indicators per Year - Total", 
+     xlab = "Year",
+     ylab = "#Indicators")
+```
+
+## Indicators per Year - Per Country {style="font-size: .8em;"}
+
+Here the number of indicators in each year is broken down by country. This is done using base R plotting.
+
+```{r}
+plot(table(indicators$Year[indicators$`Country ISO3`=='IRL']), type = "l", col = 'green3',
+     main = "Indicators per Year - Per Country", 
+     xlab = "Year",
+     ylab = "#Indicators") # Green for Ireland
+abline(v = seq(1960, 2025, 5), lty = 2, col = "gray")
+abline(h = seq(0, 2000, 500), lty = 2, col = "gray")
+lines(table(indicators$Year[indicators$`Country ISO3`=='LIE']), type = "l", col = 'red2') # Red for Liechtenstein
+lines(table(indicators$Year[indicators$`Country ISO3`=='NOR']), type = "l", col = 'navy') # Navy for Norway
+```
+
+## Indicators per Year - Per Country {style="font-size: .8em;"}
+
+As we can see, Ireland and Norway appear to follow similar trends. Both countries have an increased number of indicators every five years. Ireland appears to have slightly fewer indicators than Norway between $1970$ and $2010$. In contrast with the other two, Liechtenstein does not appear to have an increased number of indicators every five years.
+
+All countries have seen the number of indicators rise (on average) from $1960$ to $2015$, before experiencing a drop in the number of indicators from $2015$ to $2024$.
+
+# Analysis
+
+## Mean Yearly Arable Land % Since 2000
+
+Here we use the data.table function to filter the data, perform a calculation on the data, and group the data.
+
+```{r}
+indicators[Year>=2000 & `Indicator Name` == "Arable land (% of land area)", # Only include rows with years since 2000, and indicator Arable land (% of land area)
+           .('Mean Yearly Arable Land (% of land area) Since 2000' = mean(Value)), # Calculate the mean value of this indicator of the selected rows
+           by = `Country Name`] # seperate the results by country
+```
+
+Here we have the mean yearly arable land % since 2000 for all three countries.
+
+## Yearly Arable Land % in Ireland
+
+On the next slide is a plot of yearly arable land % in Ireland. We use `data.table` indexing to subset the data, before plotting the data using `ggplot2`. Note the instead of using the `by` argument to subset, it could be provided in the j step of the subsetting.
+
+```{r, eval=FALSE}
+IRL_arable <- unique(indicators[`Indicator Name` == "Arable land (% of land area)" & `Country ISO3` == 'IRL' , # Only include rows with indicator Arable land (% of land area) in the country of Ireland
+           .(`Country ISO3`, Value), # Return only the columns for country code and value
+           by = Year]) # seperate the results by year
+
+library(ggplot2)
+ggplot(data = IRL_arable, aes(x=Year,y=Value)) + # Define the data along with the x and y axes
+  geom_line(colour = 'green3', size = 1.8) + 
+  ggtitle("Plot of Yearly Arable Land % in Ireland")
+```
+
+## Yearly Arable Land % in Ireland
+
+```{r, echo=FALSE}
+IRL_arable <- unique(indicators[`Indicator Name` == "Arable land (% of land area)" & `Country ISO3` == 'IRL' , # Only include rows with indicator Arable land (% of land area) in the country of Ireland
+           .(`Country ISO3`, Value), # Return only the columns for country code and value
+           by = Year]) # seperate the results by year
+
+library(ggplot2)
+ggplot(data = IRL_arable, aes(x=Year,y=Value,)) +  # Define the data along with the x and y axes
+  geom_line(colour = 'green3', size = 1.8) + 
+  ggtitle("Plot of Yearly Arable Land % in Ireland")
+```
+
+## Yearly Arable Land % in Ireland
+
+We can see that the yearly arable land % in Ireland has decreased over time. There was a steep decrease between $1960$ and $1990$ followed by an increase between $1990$ and $2003$. This was followed by another decreasing period until the the most recent observations in $2022$.
+
+## Yearly Arable Land % Across Three Countries {style="font-size: .8em;"}
+
+Here we extend the previous graph to include all three countries in the dataset. In this version, we manually set the colours.
+
+```{r, eval=FALSE}
+arable <- unique(indicators[`Indicator Name` == "Arable land (% of land area)", # Only include rows with indicator Arable land (% of land area)
+           .(`Country ISO3`, Value), # Return only the columns for country code and value
+           by = Year]) # seperate the results by year
+
+ggplot(data = arable, aes(x=Year,y=Value,colour=`Country ISO3`)) + 
+  geom_line(size = 1.8) + 
+  scale_color_manual(values = c("IRL" = "#2E8B57","LIE" = "#CD5C5C","NOR" = "#1E90FF"),
+                     name = "Country") +
+  ggtitle("Plot of Yearly Arable Land % in Multiple Countries")
+```
+
+We will see a dramatic decrease in the yearly arable land percentage in Liechtenstein.
+
+## Yearly Arable Land % Across Three Countries {style="font-size: .8em;"}
+
+```{r, echo=FALSE}
+arable <- unique(indicators[`Indicator Name` == "Arable land (% of land area)", # Only include rows with indicator Arable land (% of land area)
+           .(`Country ISO3`, Value), # Return only the columns for country code and value
+           by = Year]) # seperate the results by year
+
+ggplot(data = arable, aes(x=Year,y=Value,colour=`Country ISO3`)) + 
+  geom_line(size = 1.8) + 
+  scale_color_manual(values = c("IRL" = "#2E8B57","LIE" = "#CD5C5C","NOR" = "#1E90FF"),
+                     name = "Country") +
+  ggtitle("Plot of Yearly Arable Land % in Multiple Countries")
+```
